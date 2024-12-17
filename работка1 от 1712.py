@@ -12,7 +12,7 @@ class Color(QWidget):
 
 import sys
 from PyQt5.QtCore import QSize, Qt
-from PyQt5.QtWidgets import (QMainWindow,QVBoxLayout, QGridLayout) 
+from PyQt5.QtWidgets import (QApplication, QMainWindow,QVBoxLayout, QGridLayout) 
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -53,3 +53,8 @@ class MainWindow(QMainWindow):
         widget = QWidget()
         widget.setLayout(layout1)
         self.setCentralWidget(widget)
+
+app = QApplication(sys.argv)
+window = MainWindow()
+window.show()
+app.exec()
