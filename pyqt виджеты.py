@@ -41,10 +41,8 @@ class UserInfoApp(QWidget):
         self.submit_button = QPushButton('Отправить')
         self.result_label = QLabel('Результаты будут отображены здесь')
 
-        # Подключаем событие нажатия на кнопку
         self.submit_button.clicked.connect(self.display_info)
 
-        # Создаем макеты
         form_layout = QFormLayout()
         form_layout.addRow(self.surname_label, self.surname_input)
         form_layout.addRow(self.name_label, self.name_input)
