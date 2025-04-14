@@ -1,0 +1,79 @@
+from PyQt5.QtWidgets import (
+    QWidget, 
+    QApplication, 
+    QPushButton, 
+    QMainWindow, 
+    QVBoxLayout,
+    QTableWidget
+)
+from PyQt5.QtGui import QIcon
+
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowIcon(QIcon("картиночка.png"))
+        self.setWindowTitle("Учим стил1")
+        self.setGeometry(100, 100, 300, 300)
+        
+        widget = QWidget()
+        self.setCentralWidget(widget)
+        layout = QVBoxLayout(widget)
+        add_btn = QPushButton("Добавить")
+        edit_btn = QPushButton("Изменить")
+        delete_btn = QPushButton("Удалить")
+        
+
+        table = QTableWidget()
+        table.setStyleSheet(
+            """ 
+            QTableWidget{
+                background-color: #EEE9E9;
+                gridline-color: #EBEBEB;
+                border: 1x solid #DADADA;
+            }
+            QTableWidget::item{
+                padding: 5px;
+            }
+            QTableWidget::item:selected{
+                background-color: #2B0BC7;
+                color: white;
+            }
+            QHeaderView::section{
+                background-color: #e0e0e0;
+                padding: 5px;
+                border: 1px solid #cccccc;
+            }
+            """
+        )
+        layout.addWidget(table)
+        layout.addWidget(add_btn)
+        layout.addWidget(edit_btn)
+        layout.addWidget(delete_btn)
+        
+        self.setStyleSheet(
+        """
+        QMainWindow{
+            background: qlineargradient(
+                x1:0, y1:0, x2:1, y2:1,
+                stop:0 #F1D302
+                stop:1 #D81159
+            )
+        }
+        """
+        )
+        
+app = QApplication([])
+app.setStyleSheet("""
+                  QPushButton {
+                      background-color: #8F2D56;
+                      color: white;
+                      padding:8px;
+                      border-radius:4px;
+                  }
+                  QPushButton:hover{
+                      background-color: #FFBC42;
+                  }
+                  """)
+window = MainWindow()
+window.show()
+app.exec()
