@@ -1,0 +1,14 @@
+QMaimWindow{
+    background-color: #19005f;
+}
+
+QPushButton{
+    background-color: #B5838D;
+    color: white;
+    padding: 8px;
+    border-radius: 4px;
+}
+
+QPushButton:hover{
+    background-color: #6D6875;
+}
