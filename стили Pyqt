@@ -1,0 +1,37 @@
+from PyQt5.QtWidgets import (
+    QWidget, 
+    QApplication, 
+    QPushButton, 
+    QMainWindow, 
+    QVBoxLayout,
+    QLabel,
+    QLineEdit,
+    QComboBox,
+    QTableWidget
+)
+from PyQt5.QtGui import QIcon, QPalette, QColor
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowIcon(QIcon("картиночка.png"))
+        self.setWindowTitle("cтилис")
+        self.setGeometry(100, 100, 800, 600)
+
+        widget = QWidget()
+        self.setCentralWidget(widget)
+        layout = QVBoxLayout(widget)
+        
+        
+        first_btn = QPushButton("Первани")
+        second_btn = QPushButton("Вторани")
+        layout.addWidget(first_btn)
+        layout.addWidget(second_btn)
+        
+
+        
+app = QApplication([])
+window = MainWindow()
+window.show()
+with open("styles.qss", "r") as file:
+    app.setStyleSheet(file.read())
+app.exec()
