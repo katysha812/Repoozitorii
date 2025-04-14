@@ -104,7 +104,7 @@ class MainWindow(QMainWindow):
             }
             """
         )
-        
+        layout.addWidget(table)
         #self.setStyleSheet("background-color: #E0E0E0;")
         
         # self.setStyleSheet(
