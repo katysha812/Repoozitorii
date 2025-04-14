@@ -1,0 +1,38 @@
+QMainWindow {
+    background: qlineargradient(
+        from 0 0 to 1 1,
+        stop 0 #F1D302,
+        stop 1 #D81159
+    );
+}
+
+QPushButton{
+    background-color: #8F2D56;
+    color: white;
+    padding: 8px;
+    border-radius: 4px;
+}
+
+QPushButton:hover{
+    background-color: #FFBC42;
+}
+
+QTableWidget{
+    background-color: #EEE9E9;
+    border: 1x solid #DADADA;
+}
+
+QTableWidget:item{
+    padding: 5px;
+}
+
+QTableWidget:item:selected{
+    background-color: #2B0BC7;
+    color: white;
+}
+
+QHeaderView:section{
+    background-color: #e0e0e0;
+    padding: 5px;
+    border: 1px solid #cccccc;
+}
