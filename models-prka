@@ -1,0 +1,111 @@
+from sqlalchemy import (
+    Table,
+    Column,
+    ForeignKey,
+    Integer,
+    String,
+    Boolean,
+    Date,
+    Float
+)
+from sqlalchemy.orm import declarative_base, relationship
+Base = declarative_base()
+
+#Данные для личного кабинета 
+
+class Goal(Base): #Цели пользователей 
+    __tablename__ = 'goal'
+    __table_args__ = {'schema': 'Name'}
+    id = Column(Integer, autoincrement=True, primary_key=True, unique=True, nullable=False)
+    name = Column(String(100), unique=True, nullable=False)
+
+class Preference(Base): #Предпочтения в питании
+    __tablename__ = 'preference'
+    __table_args__ = {'schema': 'Name'}
+    id = Column(Integer, autoincrement=True, primary_key=True, unique=True, nullable=False)
+    name = Column(String(100), unique=True, nullable=False)
+
+class User(Base): #Пользователи или основная информация для личного кабинета
+    __tablename__ = 'user'
+    __table_args__ = {'schema': 'Name'}
+    id = Column(Integer, autoincrement=True, primary_key=True, unique=True, nullable=False)
+    name = Column(String(100), unique=True, nullable=False)
+    email = Column(String(100), unique=True, nullable=False)
+    password = Column(String(100), unique=True, nullable=False)
+    gender = Column(Boolean, nullable=False)
+    height = Column(Integer, nullable=False)
+    weightgoal = Column(Float,nullable=False)
+    goal_id = Column(Integer, ForeignKey("Name.goal.id"), nullable=False)
+    preference_id = Column(Integer, ForeignKey("Name.preference.id"), nullable=False)
+
+#Отслеживание тренировок
+
+class WorkType(Base): #Типы тренировок
+    __tablename__ = 'worktype'
+    __table_args__ = {'schema': 'Name'}
+    id = Column(Integer, autoincrement=True, primary_key=True, unique=True, nullable=False)
+    name = Column(String(100), unique=True, nullable=False)
+
+class Workout(Base): #Тренировки
+    __tablename__ = 'workout'
+    __table_args__ = {'schema': 'Name'}
+    id = Column(Integer, autoincrement=True, primary_key=True, unique=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("Name.user.id"), nullable=False)
+    date = Column(Date, nullable=False)
+    time = Column(Integer,nullable=False)
+    worktype_id = Column(Integer, ForeignKey("Name.worktype.id"), nullable=False)
+    calories = Column(Float, nullable=False)
+
+class ExerciseType(Base): #Типы упражнений
+    __tablename__ = 'exercisetype'
+    __table_args__ = {'schema': 'Name'}
+    id = Column(Integer, autoincrement=True, primary_key=True, unique=True, nullable=False)
+    name = Column(String(100), unique=True, nullable=False)
+
+class ExerciseName(Base): #Названия упражнений
+    __tablename__ = 'exercisename'
+    __table_args__ = {'schema': 'Name'}
+    id = Column(Integer, autoincrement=True, primary_key=True, unique=True, nullable=False)
+    name = Column(String(100), unique=True, nullable=False)
+
+class Exercise(Base): #Упражнения тренировок
+    __tablename__ = 'exercis'
+    __table_args__ = {'schema': 'Name'}
+    id = Column(Integer, autoincrement=True, primary_key=True, unique=True, nullable=False)
+    workout_id = Column(Integer, ForeignKey("Name.workout.id"), nullable=False)
+    exercisename_id = Column(Integer, ForeignKey("Name.exercisename.id"), nullable=False)
+    sets = Column(Integer,nullable=False)
+    reps = Column(Integer,nullable=False)
+    weight = Column(Integer)
+
+#Питание
+
+class MealType(Base): #Тип приема пищи
+    __tablename__ = 'mealtype'
+    __table_args__ = {'schema': 'Name'}
+    id = Column(Integer, autoincrement=True, primary_key=True, unique=True, nullable=False)
+    name = Column(String(100), unique=True, nullable=False)
+
+class Meal(Base): #Приемы пищи
+    __tablename__ = 'meal'
+    __table_args__ = {'schema': 'Name'}
+    id = Column(Integer, autoincrement=True, primary_key=True, unique=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("Name.user.id"), nullable=False)
+    date = Column(Date, nullable=False)
+    mealtype_id = Column(Integer, ForeignKey("Name.mealtype.id"), nullable=False)
+    name = Column(String(100), unique=True, nullable=False)
+    calories = Column(Float, nullable=False)
+    protein = Column(Float, nullable=False)
+    fat = Column(Float, nullable=False)
+    carbs = Column(Float, nullable=False)
+
+#Отслеживания прогресса
+
+class Progress(Base): #Записи о прогрессе
+    __tablename__ = 'progress'
+    __table_args__ = {'schema': 'Name'}
+    id = Column(Integer, autoincrement=True, primary_key=True, unique=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("Name.user.id"), nullable=False)
+    weight = Column(Float, nullable=False)
+    date = Column(Date, nullable=False)
+    notes = Column(String(100), unique=True, nullable=False)
