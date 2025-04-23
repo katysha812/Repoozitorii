@@ -85,7 +85,7 @@ class RegisterWindow(QDialog):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Регистрация")
-        self.setFixedSize(400, 400)
+        self.setFixedSize(400, 400) #Увеличиваем размер окна
 
         layout = QVBoxLayout()
 
@@ -93,48 +93,74 @@ class RegisterWindow(QDialog):
         self.name_edit = QLineEdit()
         self.email_edit = QLineEdit()
         self.password_edit = QLineEdit()
-        self.password_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        self.confirm_password_edit = QLineEdit()
+        self.confirm_password_edit = QLineEdit() #Подтверждение пароля
         self.confirm_password_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self.gender_combo = QComboBox()
-        self.gender_combo.addItems(["Мужской", "Женский"])
+        self.gender_combo.addItem("Мужской", True)
+        self.gender_combo.addItem("Женский", False)
         self.height_edit = QLineEdit()
-        self.weight_edit = QLineEdit()
+        self.weightgoal_edit = QLineEdit()
 
-        # Кнопка регистрации
+        # Выпадающие списки для Goal и Preference
+        self.goal_combo = QComboBox()
+        self.preference_combo = QComboBox()
+
+        # Заполняем выпадающие списки данными из базы данных
+        with Session() as session:
+            goals = session.query(Goal).all()
+            preferences = session.query(Preference).all()
+
+            for goal in goals:
+                self.goal_combo.addItem(goal.name, goal.id)
+
+            for preference in preferences:
+                self.preference_combo.addItem(preference.name, preference.id)
+
+        # Кнопки
         self.register_btn = QPushButton("Зарегистрироваться")
+        self.cancel_btn = QPushButton("Отмена")
 
         # Форма
         form_layout = QFormLayout()
         form_layout.addRow("Имя:", self.name_edit)
         form_layout.addRow("Email:", self.email_edit)
         form_layout.addRow("Пароль:", self.password_edit)
-        form_layout.addRow("Подтвердите пароль:", self.confirm_password_edit)
+        form_layout.addRow("Подтверждение пароля:", self.confirm_password_edit)
         form_layout.addRow("Пол:", self.gender_combo)
         form_layout.addRow("Рост (см):", self.height_edit)
-        form_layout.addRow("Целевой вес (кг):", self.weight_edit)
-        form_layout.addRow(self.register_btn)
+        form_layout.addRow("Цель по весу (кг):", self.weightgoal_edit)
+        form_layout.addRow("Цель:", self.goal_combo)  # Добавляем выпадающий список Goal
+        form_layout.addRow("Предпочтение:", self.preference_combo)  # Добавляем выпадающий список Preference
+
+        # Кнопки
+        btn_layout = QHBoxLayout()
+        btn_layout.addWidget(self.register_btn)
+        btn_layout.addWidget(self.cancel_btn)
 
         layout.addLayout(form_layout)
+        layout.addLayout(btn_layout)
         self.setLayout(layout)
 
+        # Подключение сигналов
         self.register_btn.clicked.connect(self.register_user)
+        self.cancel_btn.clicked.connect(self.reject)
 
     def register_user(self):
         name = self.name_edit.text().strip()
         email = self.email_edit.text().strip()
         password = self.password_edit.text().strip()
         confirm_password = self.confirm_password_edit.text().strip()
-        gender = self.gender_combo.currentText() == "Мужской"
-
+        gender = self.gender_combo.currentData()
         try:
             height = int(self.height_edit.text())
-            weight = float(self.weight_edit.text())
+            weightgoal = float(self.weightgoal_edit.text())
         except ValueError:
-            QMessageBox.warning(self, "Ошибка", "Рост и вес должны быть числами!")
+            QMessageBox.warning(self, "Ошибка", "Рост и Цель по весу должны быть числами!")
             return
+        goal_id = self.goal_combo.currentData()  # Получаем выбранный Goal ID
+        preference_id = self.preference_combo.currentData()  # Получаем выбранный Preference ID
 
-        if not all([name, email, password, confirm_password]):
+        if not all([name, email, password, confirm_password, height, weightgoal, goal_id, preference_id]):
             QMessageBox.warning(self, "Ошибка", "Заполните все поля!")
             return
 
@@ -143,25 +169,28 @@ class RegisterWindow(QDialog):
             return
 
         with Session() as session:
-            if session.query(User).filter_by(email=email).first():
-                QMessageBox.warning(self, "Ошибка", "Пользователь с таким email уже существует!")
+            # Проверяем, существует ли пользователь с таким email
+            existing_user = session.query(User).filter_by(email=email).first()
+            if existing_user:
+                QMessageBox.warning(self, "Ошибка", "Пользователь с таким email уже зарегистрирован!")
                 return
 
+            # Создаем нового пользователя
             new_user = User(
                 name=name,
                 email=email,
                 password=password,
                 gender=gender,
                 height=height,
-                weightgoal=weight,
-                goal_id=3,  # Поддержание формы по умолчанию
-                preference_id=1  # Стандартное питание по умолчанию
+                weightgoal=weightgoal,
+                goal_id=goal_id,  # Присваиваем Goal ID
+                preference_id=preference_id  # Присваиваем Preference ID
             )
-
             session.add(new_user)
             session.commit()
-            QMessageBox.information(self, "Успех", "Регистрация прошла успешно!")
-            self.close()
+
+        QMessageBox.information(self, "Успех", "Регистрация прошла успешно!")
+        self.accept()
 
 class MainWindow(QMainWindow):
     def __init__(self, user):
@@ -372,11 +401,11 @@ class MainWindow(QMainWindow):
         return tab
 
     def edit_profile(self):
-        self.edit_window = EditProfileWindow(self.user)
+        self.edit_window = ProfileWindow(self.user)
         if self.edit_window.exec():
             # Обновляем данные в интерфейсе
             with Session() as session:
-                updated_user = session.query(User).get(self.user.id)
+                updated_user = session.get(User, self.user.id)
                 self.user = updated_user
 
                 self.name_label.setText(updated_user.name)
@@ -388,11 +417,11 @@ class MainWindow(QMainWindow):
     def delete_profile(self):
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить профиль? Это действие нельзя отменить.",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
 
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
-                user = session.query(User).get(self.user.id)
+                user = session.get(User, self.user.id)
                 session.delete(user)
                 session.commit()
 
@@ -402,16 +431,20 @@ class MainWindow(QMainWindow):
             self.login_window.show()
 
     def load_workouts(self):
-        with Session() as session:
-            workouts = session.query(Workout).filter_by(user_id=self.user.id).all()
-        self.workouts_table.setRowCount(len(workouts))
+            with Session() as session:
+                workouts = session.query(Workout).filter_by(user_id=self.user.id).all()
 
-        for row, workout in enumerate(workouts):
-            total_calories = sum(exercise.calories for exercise in workout.exercise_associations)
-
-            self.workouts_table.setItem(row, 0, QTableWidgetItem(str(workout.date)))
-            self.workouts_table.setItem(row, 1, QTableWidgetItem(str(workout.time)))
-            self.workouts_table.setItem(row, 2, QTableWidgetItem(str(total_calories)))
+                self.workouts_table.setRowCount(len(workouts))
+                for row, workout in enumerate(workouts):
+                    # Получаем данные для отображения в таблице
+                    with Session() as session_inner:
+                        workout_loaded = session_inner.get(Workout, workout.id)
+                        total_calories = sum(exercise.calories for exercise in workout_loaded.exercise_associations if exercise.calories is not None)
+                    self.workouts_table.setItem(row, 0, QTableWidgetItem(workout.date.strftime("%d.%m.%Y")))
+                    self.workouts_table.setItem(row, 1, QTableWidgetItem(workout.worktype.name))
+                    self.workouts_table.setItem(row, 2, QTableWidgetItem(str(workout.time)))
+                    self.workouts_table.setItem(row, 3, QTableWidgetItem(str(total_calories)))
+                    self.workouts_table.item(row, 0).setData(Qt.ItemDataRole.UserRole, workout.id)
 
     def add_workout(self):
         self.workout_window = WorkoutWindow(self.user)
@@ -442,11 +475,11 @@ class MainWindow(QMainWindow):
 
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить эту тренировку?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
 
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
-                workout = session.query(Workout).get(workout_id)
+                workout = session.get(Workout, workout_id)
                 session.delete(workout)
                 session.commit()
 
@@ -457,12 +490,12 @@ class MainWindow(QMainWindow):
         if selected_row == -1:
             QMessageBox.warning(self, "Ошибка", "Выберите тренировку для просмотра упражнений!")
             return
-
+        
         workout_id = self.workouts_table.item(selected_row, 0).data(Qt.ItemDataRole.UserRole)
-
+        
         with Session() as session:
             workout = session.query(Workout).get(workout_id)
-            self.exercises_window = ExercisesWindow(workout)
+            self.exercises_window = ExercisesWindow(workout) #Изменил передаваемый параметр
             self.exercises_window.exec()
 
     def search_workouts(self):
@@ -528,9 +561,9 @@ class MainWindow(QMainWindow):
 
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить этот прием пищи?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
 
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 meal = session.query(Meal).get(meal_id)
                 session.delete(meal)
@@ -586,9 +619,9 @@ class MainWindow(QMainWindow):
 
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить эту запись?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
 
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 progress = session.query(Progress).get(progress_id)
                 session.delete(progress)
@@ -596,7 +629,7 @@ class MainWindow(QMainWindow):
 
             self.load_progress()
 
-class EditProfileWindow(QDialog):
+class ProfileWindow(QDialog):
     def __init__(self, user):
         super().__init__()
         self.user = user
@@ -605,17 +638,42 @@ class EditProfileWindow(QDialog):
 
         layout = QVBoxLayout()
 
-        # Поля для редактирования
-        self.name_edit = QLineEdit(user.name)
-        self.email_edit = QLineEdit(user.email)
-        self.gender_combo = QComboBox()
-        self.gender_combo.addItems(["Мужской", "Женский"])
-        self.gender_combo.setCurrentIndex(0 if user.gender else 1)
-        self.height_edit = QLineEdit(str(user.height))
-        self.weight_edit = QLineEdit(str(user.weightgoal))
+        # Поля для ввода
+        self.name_edit = QLineEdit(self.user.name)
+        self.email_edit = QLineEdit(self.user.email)
         self.password_edit = QLineEdit()
-        self.password_edit.setPlaceholderText("Оставьте пустым, чтобы не менять")
-        self.password_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self.gender_combo = QComboBox()
+        self.gender_combo.addItem("Мужской", True)
+        self.gender_combo.addItem("Женский", False)
+        self.gender_combo.setCurrentIndex(0 if self.user.gender else 1) # Устанавливаем текущий пол
+        self.height_edit = QLineEdit(str(self.user.height))
+        self.weightgoal_edit = QLineEdit(str(self.user.weightgoal))
+
+        # Выпадающие списки для Goal и Preference
+        self.goal_combo = QComboBox()
+        self.preference_combo = QComboBox()
+
+        # Заполняем выпадающие списки данными из базы данных
+        with Session() as session:
+            goals = session.query(Goal).all()
+            preferences = session.query(Preference).all()
+
+            for goal in goals:
+                self.goal_combo.addItem(goal.name, goal.id)
+
+            for preference in preferences:
+                self.preference_combo.addItem(preference.name, preference.id)
+
+            # Устанавливаем текущие Goal и Preference
+            if hasattr(self.user, 'goal') and self.user.goal:  # Проверяем наличие атрибута и его значение
+                goal_index = self.goal_combo.findData(self.user.goal.id)
+                if goal_index >= 0:
+                    self.goal_combo.setCurrentIndex(goal_index)
+
+            if hasattr(self.user, 'preference') and self.user.preference:  # Проверяем наличие атрибута и его значение
+                preference_index = self.preference_combo.findData(self.user.preference.id)
+                if preference_index >= 0:
+                    self.preference_combo.setCurrentIndex(preference_index)
 
         # Кнопки
         self.save_btn = QPushButton("Сохранить")
@@ -625,10 +683,12 @@ class EditProfileWindow(QDialog):
         form_layout = QFormLayout()
         form_layout.addRow("Имя:", self.name_edit)
         form_layout.addRow("Email:", self.email_edit)
+        form_layout.addRow("Пароль (оставьте пустым, чтобы не менять):", self.password_edit)
         form_layout.addRow("Пол:", self.gender_combo)
         form_layout.addRow("Рост (см):", self.height_edit)
-        form_layout.addRow("Целевой вес (кг):", self.weight_edit)
-        form_layout.addRow("Новый пароль:", self.password_edit)
+        form_layout.addRow("Цель по весу (кг):", self.weightgoal_edit)
+        form_layout.addRow("Цель:", self.goal_combo)  # Добавляем выпадающий список Goal
+        form_layout.addRow("Предпочтение:", self.preference_combo)  # Добавляем выпадающий список Preference
 
         # Кнопки
         btn_layout = QHBoxLayout()
@@ -646,39 +706,39 @@ class EditProfileWindow(QDialog):
     def save_profile(self):
         name = self.name_edit.text().strip()
         email = self.email_edit.text().strip()
-        gender = self.gender_combo.currentText() == "Мужской"
-        new_password = self.password_edit.text().strip()
-
+        password = self.password_edit.text().strip()
+        gender = self.gender_combo.currentData()
         try:
             height = int(self.height_edit.text())
-            weight = float(self.weight_edit.text())
+            weightgoal = float(self.weightgoal_edit.text())
         except ValueError:
-            QMessageBox.warning(self, "Ошибка", "Рост и вес должны быть числами!")
+            QMessageBox.warning(self, "Ошибка", "Рост и Цель по весу должны быть числами!")
             return
+        goal_id = self.goal_combo.currentData()  # Получаем выбранный Goal ID
+        preference_id = self.preference_combo.currentData()  # Получаем выбранный Preference ID
 
-        if not all([name, email]):
-            QMessageBox.warning(self, "Ошибка", "Заполните все обязательные поля!")
+        if not all([name, email, height, weightgoal, goal_id, preference_id]):
+            QMessageBox.warning(self, "Ошибка", "Заполните все поля!")
             return
 
         with Session() as session:
-            # Проверяем, не занят ли email другим пользователем
-            if email != self.user.email and session.query(User).filter_by(email=email).first():
-                QMessageBox.warning(self, "Ошибка", "Пользователь с таким email уже существует!")
-                return
+            user = session.get(User, self.user.id)
 
-            user = session.query(User).get(self.user.id)
+            # Обновляем данные пользователя
             user.name = name
             user.email = email
+            if password:  # Если пароль был введен, обновляем его
+                user.password = password
             user.gender = gender
             user.height = height
-            user.weightgoal = weight
-
-            if new_password:
-                user.password = new_password
+            user.weightgoal = weightgoal
+            user.goal_id = goal_id  # Обновляем Goal ID
+            user.preference_id = preference_id  # Обновляем Preference ID
 
             session.commit()
-            QMessageBox.information(self, "Успех", "Профиль успешно обновлен!")
-            self.accept()
+
+        QMessageBox.information(self, "Успех", "Профиль успешно обновлен!")
+        self.accept()
 
 class WorkoutWindow(QDialog):
     def __init__(self, user, workout=None):
@@ -760,7 +820,10 @@ class WorkoutWindow(QDialog):
             self.load_exercises()
             
     def add_exercise(self):
-        self.exercise_window = ExerciseWindow(self.workout)
+        if not self.workout:
+            QMessageBox.warning(self, "Ошибка", "Сначала сохраните тренировку!")
+            return
+        self.exercise_window = ExerciseWindow(self.workout) #Создание окна
         if self.exercise_window.exec():
             self.load_exercises()
         
@@ -788,9 +851,9 @@ class WorkoutWindow(QDialog):
 
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить это упражнение?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
 
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 exercise = session.query(WorkoutExercise).get(exercise_id)
                 session.delete(exercise)
@@ -806,14 +869,14 @@ class WorkoutWindow(QDialog):
             time = int(self.time_edit.text())
             #calories = float(self.calories_edit.text()) # Не нужно считывать калории
         except ValueError:
-            QMessageBox.warning(self, "Ошибка", "Длительность и калории должны быть числами!")
+            QMessageBox.warning(self, "Ошибка", "Длительность должна быть числом!")
             return
 
         if not all([date, worktype_id, time]):
             QMessageBox.warning(self, "Ошибка", "Заполните все поля!")
             return
             
-        with Session(engine) as session:
+        with Session() as session:
             if self.workout:
                 # Редактируем существующую тренировку
                 workout = session.query(Workout).get(self.workout.id)
@@ -837,7 +900,7 @@ class WorkoutWindow(QDialog):
             self.accept()
     
     def load_exercises(self):
-        with Session(engine) as session:
+        with Session() as session:
             if self.workout:
                 workout = session.query(Workout).get(self.workout.id)
                 exercises = workout.exercise_associations
@@ -1013,7 +1076,7 @@ class ExercisesWindow(QDialog):
             QMessageBox.warning(self, "Ошибка", "Сначала сохраните тренировку!")
             return
         self.exercise_window = ExerciseWindow(self.workout)
-        if self.exercise_window.exec_():
+        if self.exercise_window.exec():
             self.load_exercises()
 
     def edit_exercise(self):
@@ -1028,10 +1091,10 @@ class ExercisesWindow(QDialog):
 
         exercise_id = self.exercises_table.item(selected_row, 0).data(Qt.ItemDataRole.UserRole)
 
-        with Session(engine) as session:
+        with Session() as session:
             exercise = session.query(WorkoutExercise).get(exercise_id)
             self.exercise_window = ExerciseWindow(self.workout, exercise)
-            if self.exercise_window.exec_():
+            if self.exercise_window.exec():
                 self.load_exercises()
             
 class MealWindow(QDialog):
@@ -1258,10 +1321,11 @@ class AdminWindow(QMainWindow):
         self.load_users()
         self.load_workouts_admin()
         self.load_exercises_admin()
-        self.load_meals_admin()
+        #self.load_meals_admin()
         self.load_progress_admin()
         self.load_preferences()
         self.load_goals()
+        
     def create_preferences_tab(self):
         tab = QWidget()
         layout = QVBoxLayout()
@@ -1502,22 +1566,19 @@ class AdminWindow(QMainWindow):
 
     def load_users(self):
         with Session() as session:
-            users = session.query(User).options(joinedload(User.goal)).all()
-            
+            users = session.query(User).all()
+
             self.users_table.setRowCount(len(users))
             for i, user in enumerate(users):
+                print(f"Loading user: {user.name}, has goal: {hasattr(user, 'goal')}") #Добавил
                 self.users_table.setItem(i, 0, QTableWidgetItem(user.name))
                 self.users_table.setItem(i, 1, QTableWidgetItem(user.email))
                 self.users_table.setItem(i, 2, QTableWidgetItem("Мужской" if user.gender else "Женский"))
                 self.users_table.setItem(i, 3, QTableWidgetItem(str(user.height)))
                 self.users_table.setItem(i, 4, QTableWidgetItem(str(user.weightgoal)))
-                
-                # Safely get goal name
+                #goal_name = user.goal.name if hasattr(user, 'goal') and user.goal else "" #<- проверяем с помощью hasattr
                 goal_name = ""
-                if hasattr(user, 'goal') and user.goal:
-                    goal_name = user.goal.name
-                self.users_table.setItem(i, 5, QTableWidgetItem(goal_name))
-                
+                #self.users_table.setItem(i, 5, QTableWidgetItem(goal_name)) #Временно убираем
                 self.users_table.item(i, 0).setData(Qt.ItemDataRole.UserRole, user.id)
 
     def load_workouts_admin(self):
@@ -1545,7 +1606,7 @@ class AdminWindow(QMainWindow):
             for i, exercise in enumerate(exercises):
                 self.exercises_table.setItem(i, 0, QTableWidgetItem(exercise.name))
                 self.exercises_table.setItem(i, 1, QTableWidgetItem(exercise.exercisetype.name))
-                self.exercises_table.item(i, 0).setData(Qt.UserRole, exercise.id)
+                self.exercises_table.item(i, 0).setData(Qt.ItemDataRole.UserRole, exercise.id)
 
     def load_meals_admin(self):
         with Session() as session:
@@ -1561,7 +1622,7 @@ class AdminWindow(QMainWindow):
                 self.meals_table.setItem(i, 5, QTableWidgetItem(str(meal.protein)))
                 self.meals_table.setItem(i, 6, QTableWidgetItem(str(meal.fat)))
                 self.meals_table.setItem(i, 7, QTableWidgetItem(str(meal.carbs)))
-                self.meals_table.item(i, 0).setData(Qt.UserRole, meal.id)
+                self.meals_table.item(i, 0).setData(Qt.ItemDataRole.UserRole, meal.id)
 
     def load_progress_admin(self):
         with Session() as session:
@@ -1573,7 +1634,7 @@ class AdminWindow(QMainWindow):
                 self.progress_table.setItem(i, 1, QTableWidgetItem(entry.date.strftime("%d.%m.%Y")))
                 self.progress_table.setItem(i, 2, QTableWidgetItem(str(entry.weight)))
                 self.progress_table.setItem(i, 3, QTableWidgetItem(entry.notes))
-                self.progress_table.item(i, 0).setData(Qt.UserRole, entry.id)
+                self.progress_table.item(i, 0).setData(Qt.ItemDataRole.UserRole, entry.id)
                 
     def add_preference(self):
         self.preference_window = PreferenceWindowAdmin()
@@ -1586,7 +1647,7 @@ class AdminWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Выберите предпочтение для редактирования!")
             return
         
-        pref_id = self.preferences_table.item(selected_row, 0).data(Qt.UserRole)
+        pref_id = self.preferences_table.item(selected_row, 0).data(Qt.ItemDataRole.UserRole)
         
         with Session() as session:
             preference = session.query(Preference).get(pref_id)
@@ -1600,13 +1661,13 @@ class AdminWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Выберите предпочтение для удаления!")
             return
         
-        pref_id = self.preferences_table.item(selected_row, 0).data(Qt.UserRole)
+        pref_id = self.preferences_table.item(selected_row, 0).data(Qt.ItemDataRole.UserRole)
         
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить это предпочтение?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 preference = session.query(Preference).get(pref_id)
                 session.delete(preference)
@@ -1625,7 +1686,7 @@ class AdminWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Выберите цель для редактирования!")
             return
         
-        goal_id = self.goals_table.item(selected_row, 0).data(Qt.UserRole)
+        goal_id = self.goals_table.item(selected_row, 0).data(Qt.ItemDataRole.UserRole)
         
         with Session() as session:
             goal = session.query(Goal).get(goal_id)
@@ -1639,13 +1700,13 @@ class AdminWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Выберите цель для удаления!")
             return
         
-        goal_id = self.goals_table.item(selected_row, 0).data(Qt.UserRole)
+        goal_id = self.goals_table.item(selected_row, 0).data(Qt.ItemDataRole.UserRole)
         
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить эту цель?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 goal = session.query(Goal).get(goal_id)
                 session.delete(goal)
@@ -1664,10 +1725,10 @@ class AdminWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Выберите пользователя для редактирования!")
             return
         
-        user_id = self.users_table.item(selected_row, 0).data(Qt.UserRole)
+        user_id = self.users_table.item(selected_row, 0).data(Qt.ItemDataRole.UserRole)
         
         with Session() as session:
-            user = session.query(User).get(user_id)
+            user = session.get(User, self.user.id)
             self.user_window = UserAdminWindow(user)
             if self.user_window.exec():
                 self.load_users()
@@ -1678,15 +1739,15 @@ class AdminWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Выберите пользователя для удаления!")
             return
         
-        user_id = self.users_table.item(selected_row, 0).data(Qt.UserRole)
+        user_id = self.users_table.item(selected_row, 0).data(Qt.ItemDataRole.UserRole)
         
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить этого пользователя?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
-                user = session.query(User).get(user_id)
+                user = session.get(User, self.user.id)
                 session.delete(user)
                 session.commit()
             
@@ -1711,7 +1772,7 @@ class AdminWindow(QMainWindow):
             if self.workout_window.exec():
                 self.load_workouts()
 
-        workout_id = self.workouts_table.item(selected_row, 0).data(Qt.UserRole)
+        workout_id = self.workouts_table.item(selected_row, 0).data(Qt.ItemDataRole.UserRole)
 
         with Session() as session:
             workout = session.query(Workout).get(workout_id)
@@ -1725,13 +1786,13 @@ class AdminWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Выберите тренировку для удаления!")
             return
 
-        workout_id = self.workouts_table.item(selected_row, 0).data(Qt.UserRole)
+        workout_id = self.workouts_table.item(selected_row, 0).data(Qt.ItemDataRole.UserRole)
 
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить эту тренировку?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
 
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 workout = session.query(Workout).get(workout_id)
                 session.delete(workout)
@@ -1750,7 +1811,7 @@ class AdminWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Выберите упражнение для редактирования!")
             return
 
-        exercise_id = self.exercises_table.item(selected_row, 0).data(Qt.UserRole)
+        exercise_id = self.exercises_table.item(selected_row, 0).data(Qt.ItemDataRole.UserRole)
 
         with Session() as session:
             exercise = session.query(ExerciseName).get(exercise_id)
@@ -1764,13 +1825,13 @@ class AdminWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Выберите упражнение для удаления!")
             return
 
-        exercise_id = self.exercises_table.item(selected_row, 0).data(Qt.UserRole)
+        exercise_id = self.exercises_table.item(selected_row, 0).data(Qt.ItemDataRole.UserRole)
 
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить это упражнение?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
 
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 exercise = session.query(ExerciseName).get(exercise_id)
                 session.delete(exercise)
@@ -1789,7 +1850,7 @@ class AdminWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Выберите прием пищи для редактирования!")
             return
 
-        meal_id = self.meals_table.item(selected_row, 0).data(Qt.UserRole)
+        meal_id = self.meals_table.item(selected_row, 0).data(Qt.ItemDataRole.UserRole)
 
         with Session() as session:
             meal = session.query(Meal).get(meal_id)
@@ -1803,13 +1864,13 @@ class AdminWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Выберите прием пищи для удаления!")
             return
 
-        meal_id = self.meals_table.item(selected_row, 0).data(Qt.UserRole)
+        meal_id = self.meals_table.item(selected_row, 0).data(Qt.ItemDataRole.UserRole)
 
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить этот прием пищи?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
 
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 meal = session.query(Meal).get(meal_id)
                 session.delete(meal)
@@ -1828,7 +1889,7 @@ class AdminWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Выберите запись для редактирования!")
             return
 
-        progress_id = self.progress_table.item(selected_row, 0).data(Qt.UserRole)
+        progress_id = self.progress_table.item(selected_row, 0).data(Qt.ItemDataRole.UserRole)
 
         with Session() as session:
             progress = session.query(Progress).get(progress_id)
@@ -1842,13 +1903,13 @@ class AdminWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Выберите запись для удаления!")
             return
 
-        progress_id = self.progress_table.item(selected_row, 0).data(Qt.UserRole)
+        progress_id = self.progress_table.item(selected_row, 0).data(Qt.ItemDataRole.UserRole)
 
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить эту запись?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
 
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 progress = session.query(Progress).get(progress_id)
                 session.delete(progress)
@@ -1867,7 +1928,7 @@ class AdminWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Выберите предпочтение для редактирования!")
             return
         
-        pref_id = self.preferences_table.item(selected_row, 0).data(Qt.UserRole)
+        pref_id = self.preferences_table.item(selected_row, 0).data(Qt.ItemDataRole.UserRole)
         
         with Session() as session:
             preference = session.query(Preference).get(pref_id)
@@ -1881,13 +1942,13 @@ class AdminWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Выберите предпочтение для удаления!")
             return
         
-        pref_id = self.preferences_table.item(selected_row, 0).data(Qt.UserRole)
+        pref_id = self.preferences_table.item(selected_row, 0).data(Qt.ItemDataRole.UserRole)
         
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить это предпочтение?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 preference = session.query(Preference).get(pref_id)
                 session.delete(preference)
@@ -1906,7 +1967,7 @@ class AdminWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Выберите цель для редактирования!")
             return
         
-        goal_id = self.goals_table.item(selected_row, 0).data(Qt.UserRole)
+        goal_id = self.goals_table.item(selected_row, 0).data(Qt.ItemDataRole.UserRole)
         
         with Session() as session:
             goal = session.query(Goal).get(goal_id)
@@ -1920,13 +1981,13 @@ class AdminWindow(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Выберите цель для удаления!")
             return
         
-        goal_id = self.goals_table.item(selected_row, 0).data(Qt.UserRole)
+        goal_id = self.goals_table.item(selected_row, 0).data(Qt.ItemDataRole.UserRole)
         
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить эту цель?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 goal = session.query(Goal).get(goal_id)
                 session.delete(goal)
@@ -2032,7 +2093,7 @@ class UserAdminWindow(QDialog):
         with Session() as session:
             if self.user:
                 # Редактируем существующего пользователя
-                user = session.query(User).get(self.user.id)
+                user = session.get(User, self.user.id)
                 user.name = name
                 user.email = email
                 if password:
@@ -2619,9 +2680,9 @@ class ProgressWindowAdmin(QDialog):
         
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить это предпочтение?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 preference = session.query(Preference).get(pref_id)
                 session.delete(preference)
@@ -2658,9 +2719,9 @@ class ProgressWindowAdmin(QDialog):
         
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить эту цель?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 goal = session.query(Goal).get(goal_id)
                 session.delete(goal)
@@ -2682,7 +2743,7 @@ class ProgressWindowAdmin(QDialog):
         user_id = self.users_table.item(selected_row, 0).data(Qt.UserRole)
         
         with Session() as session:
-            user = session.query(User).get(user_id)
+            user = session.get(User, self.user.id)
             self.user_window = UserAdminWindow(user)
             if self.user_window.exec():
                 self.load_users()
@@ -2697,11 +2758,11 @@ class ProgressWindowAdmin(QDialog):
         
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить этого пользователя?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
-                user = session.query(User).get(user_id)
+                user = session.get(User, self.user.id)
                 session.delete(user)
                 session.commit()
             
@@ -2736,9 +2797,9 @@ class ProgressWindowAdmin(QDialog):
 
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить эту тренировку?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
 
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 workout = session.query(Workout).get(workout_id)
                 session.delete(workout)
@@ -2775,9 +2836,9 @@ class ProgressWindowAdmin(QDialog):
 
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить это упражнение?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
 
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 exercise = session.query(ExerciseName).get(exercise_id)
                 session.delete(exercise)
@@ -2814,9 +2875,9 @@ class ProgressWindowAdmin(QDialog):
 
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить этот прием пищи?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
 
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 meal = session.query(Meal).get(meal_id)
                 session.delete(meal)
@@ -2853,9 +2914,9 @@ class ProgressWindowAdmin(QDialog):
 
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить эту запись?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
 
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 progress = session.query(Progress).get(progress_id)
                 session.delete(progress)
@@ -2892,9 +2953,9 @@ class ProgressWindowAdmin(QDialog):
         
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить это предпочтение?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 preference = session.query(Preference).get(pref_id)
                 session.delete(preference)
@@ -2931,9 +2992,9 @@ class ProgressWindowAdmin(QDialog):
         
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить эту цель?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 goal = session.query(Goal).get(goal_id)
                 session.delete(goal)
@@ -3039,7 +3100,7 @@ class UserAdminWindow(QDialog):
         with Session() as session:
             if self.user:
                 # Редактируем существующего пользователя
-                user = session.query(User).get(self.user.id)
+                user = session.get(User, self.user.id)
                 user.name = name
                 user.email = email
                 if password:
@@ -3611,15 +3672,33 @@ class AdminWindow(QMainWindow):
     def load_users(self):
         with Session() as session:
             users = session.query(User).all()
-           
+
             self.users_table.setRowCount(len(users))
             for i, user in enumerate(users):
+                print(f"Loading user: {user.name}, goal_id: {user.goal_id}, preference_id: {user.preference_id}")  # Для отладки
+
                 self.users_table.setItem(i, 0, QTableWidgetItem(user.name))
                 self.users_table.setItem(i, 1, QTableWidgetItem(user.email))
                 self.users_table.setItem(i, 2, QTableWidgetItem("Мужской" if user.gender else "Женский"))
                 self.users_table.setItem(i, 3, QTableWidgetItem(str(user.height)))
                 self.users_table.setItem(i, 4, QTableWidgetItem(str(user.weightgoal)))
-                self.users_table.setItem(i, 5, QTableWidgetItem(user.goal.name if user.goal else ""))
+
+                # Получаем имя цели
+                goal_name = ""
+                if user.goal_id:
+                    goal = session.get(Goal, user.goal_id)
+                    if goal:
+                        goal_name = goal.name
+                self.users_table.setItem(i, 5, QTableWidgetItem(goal_name))
+
+                # Получаем имя предпочтения
+                preference_name = ""
+                if user.preference_id:
+                    preference = session.get(Preference, user.preference_id)
+                    if preference:
+                        preference_name = preference.name
+                self.users_table.setItem(i, 6, QTableWidgetItem(preference_name)) 
+
                 self.users_table.item(i, 0).setData(Qt.ItemDataRole.UserRole, user.id)
 
     def load_workouts_admin(self):
@@ -3646,7 +3725,7 @@ class AdminWindow(QMainWindow):
             self.exercises_table.setRowCount(len(exercises))
             for i, exercise in enumerate(exercises):
                 self.exercises_table.setItem(i, 0, QTableWidgetItem(exercise.name))
-                self.exercises_table.setItem(i, 1, QTableWidgetItem(exercise.exercisetype.name))
+                self.exercises_table.setItem(i, 1, QTableWidgetItem(exercise.exercise_type.name))
                 self.exercises_table.item(i, 0).setData(Qt.ItemDataRole.UserRole, exercise.id)
 
     def load_meals(self):
@@ -3706,9 +3785,9 @@ class AdminWindow(QMainWindow):
         
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить это предпочтение?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 preference = session.query(Preference).get(pref_id)
                 session.delete(preference)
@@ -3745,9 +3824,9 @@ class AdminWindow(QMainWindow):
         
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить эту цель?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 goal = session.query(Goal).get(goal_id)
                 session.delete(goal)
@@ -3769,7 +3848,7 @@ class AdminWindow(QMainWindow):
         user_id = self.users_table.item(selected_row, 0).data(Qt.ItemDataRole.UserRole)
         
         with Session() as session:
-            user = session.query(User).get(user_id)
+            user = session.get(User, self.user.id)
             self.user_window = UserAdminWindow(user)
             if self.user_window.exec():
                 self.load_users()
@@ -3784,11 +3863,11 @@ class AdminWindow(QMainWindow):
         
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить этого пользователя?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
-                user = session.query(User).get(user_id)
+                user = session.get(User, self.user.id)
                 session.delete(user)
                 session.commit()
             
@@ -3823,9 +3902,9 @@ class AdminWindow(QMainWindow):
 
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить эту тренировку?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
 
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 workout = session.query(Workout).get(workout_id)
                 session.delete(workout)
@@ -3862,9 +3941,9 @@ class AdminWindow(QMainWindow):
 
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить это упражнение?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
 
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 exercise = session.query(ExerciseName).get(exercise_id)
                 session.delete(exercise)
@@ -3901,9 +3980,9 @@ class AdminWindow(QMainWindow):
 
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить этот прием пищи?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
 
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 meal = session.query(Meal).get(meal_id)
                 session.delete(meal)
@@ -3940,9 +4019,9 @@ class AdminWindow(QMainWindow):
 
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить эту запись?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
 
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 progress = session.query(Progress).get(progress_id)
                 session.delete(progress)
@@ -3979,9 +4058,9 @@ class AdminWindow(QMainWindow):
         
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить это предпочтение?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 preference = session.query(Preference).get(pref_id)
                 session.delete(preference)
@@ -4018,9 +4097,9 @@ class AdminWindow(QMainWindow):
         
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить эту цель?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 goal = session.query(Goal).get(goal_id)
                 session.delete(goal)
@@ -4126,7 +4205,7 @@ class UserAdminWindow(QDialog):
         with Session() as session:
             if self.user:
                 # Редактируем существующего пользователя
-                user = session.query(User).get(self.user.id)
+                user = session.get(User, self.user.id)
                 user.name = name
                 user.email = email
                 if password:
@@ -4723,9 +4802,9 @@ class ProgressWindowAdmin(QDialog):
         
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить это предпочтение?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 preference = session.query(Preference).get(pref_id)
                 session.delete(preference)
@@ -4762,9 +4841,9 @@ class ProgressWindowAdmin(QDialog):
         
         reply = QMessageBox.question(self, "Подтверждение",
                                     "Вы уверены, что хотите удалить эту цель?",
-                                    QMessageBox.Yes | QMessageBox.No)
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             with Session() as session:
                 goal = session.query(Goal).get(goal_id)
                 session.delete(goal)
@@ -4870,7 +4949,7 @@ class UserAdminWindow(QDialog):
         with Session() as session:
             if self.user:
                 # Редактируем существующего пользователя
-                user = session.query(User).get(self.user.id)
+                user = session.get(User, self.user.id)
                 user.name = name
                 user.email = email
                 if password:
@@ -5050,6 +5129,16 @@ if __name__ == "__main__":
     Base.metadata.create_all(engine)
     
     app = QApplication([])
+    
+    try:
+        with open("stylesheet.css", "r") as f:
+            style = f.read()
+            app.setStyleSheet(style)
+    except FileNotFoundError:
+        print("Файл стилей не найден!")
+    except Exception as e:
+        print(f"Ошибка при загрузке стилей: {e}")
+
     login_window = LoginWindow()
     center_window(login_window)  # Центрируем окно входа
     login_window.show()
