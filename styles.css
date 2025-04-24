@@ -1,0 +1,86 @@
+QMainWindow {
+    background-color: #e0e0e0; /* Еще светлее серый */
+}
+
+QWidget {
+    background-color: #f0f0f0; /* Светло-серый фон */
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+    color: #333; /* Темно-серый текст */
+}
+
+QTabWidget::pane {
+    border: 1px solid #c0c0c0; /* Серая рамка */
+    background-color: #f8f8f8; /* Почти белый фон */
+}
+
+QTabBar::tab {
+    background-color: #d0d0d0; /* Светло-серый фон для вкладок */
+    color: #333;
+    padding: 8px 20px;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+}
+
+QTabBar::tab:selected {
+    background-color: #a0a0a0; /* Темнее серый для выбранной вкладки */
+    color: #fff; /* Белый текст для выбранной вкладки */
+}
+
+QPushButton {
+    background-color: #5cb85c; /* Зеленый фон */
+    color: #fff; /* Белый текст */
+    border: none;
+    padding: 8px 15px;
+    border-radius: 5px;
+}
+
+QPushButton:hover {
+    background-color: #449d44; /* Темнее зеленый при наведении */
+}
+
+QPushButton:pressed {
+    background-color: #398439; /* Еще темнее зеленый при нажатии */
+}
+
+QLineEdit {
+    background-color: #fff; /* Белый фон */
+    border: 1px solid #c0c0c0; /* Серая рамка */
+    padding: 5px;
+    border-radius: 3px;
+}
+
+QLabel {
+    color: #555; /* Светлее темно-серого */
+}
+
+QTableWidget {
+    background-color: #fff;
+    border: 1px solid #c0c0c0;
+}
+
+QHeaderView::section {
+    background-color: #d0d0d0;
+    color: #333;
+    padding: 5px;
+    border: none;
+}
+
+QDialog {
+    background-color: #f5f5f5;
+}
+
+QGroupBox {
+    border: 1px solid #999;
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top center;
+    padding: 0 5px;
+    background-color: #f0f0f0;
+    color: #777;
+}
